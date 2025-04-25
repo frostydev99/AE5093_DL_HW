@@ -1,0 +1,161 @@
+\documentclass[11pt]{article}
+
+% Load fontspec package to set the font with LuaLaTeX
+% \usepackage{fontspec}
+
+% Set the main font to Courier New
+% \setmainfont{Courier New}
+
+\usepackage[margin = 0.75in]{geometry}
+\geometry{letterpaper}
+
+\usepackage{graphicx}
+\usepackage{amssymb, amsmath}
+\usepackage{breqn}
+\usepackage{epstopdf}
+\usepackage{enumerate}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{listings}
+\usepackage{indentfirst}
+\usepackage{xcolor}
+\usepackage[T1]{fontenc}
+\usepackage{subcaption}
+
+
+\definecolor{codebg}{rgb}{0.95,0.95,0.95}
+\definecolor{keywordcolor}{rgb}{0.0,0.0,0.6}
+\definecolor{stringcolor}{rgb}{0.58,0,0.03}
+\definecolor{commentcolor}{rgb}{0.0,0.5,0.0}
+
+\lstdefinelanguage{Python}{
+    keywords={def, return, if, elif, else, while, for, in, try, except, finally, raise, import, from, as, pass, class, break, continue, with, lambda, assert, yield, True, False, None, and, or, not, is},
+    keywordstyle=\color{keywordcolor}\bfseries,
+    ndkeywords={self},
+    ndkeywordstyle=\color{black},
+    identifierstyle=\color{black},
+    sensitive=true,
+    comment=[l]\#,
+    commentstyle=\color{commentcolor}\ttfamily,
+    stringstyle=\color{stringcolor},
+    morestring=[b]',
+    morestring=[b]",
+    morecomment=[s]{"""}{"""},
+    morecomment=[s]{'''}{'''},
+}
+
+\lstset{
+    language=Python,
+    backgroundcolor=\color{codebg},
+    basicstyle=\ttfamily\footnotesize,
+    frame=single,
+    showstringspaces=false,
+    tabsize=4,
+    captionpos=b,
+    breaklines=true,
+    breakatwhitespace=true,
+    numbers=left,
+    numberstyle=\tiny\color{gray},
+}
+
+\DeclareGraphicsRule{.tif}{png}{.png}{convert #1 dirname #1/basename #1 .tif.png}
+\graphicspath{{./figures/}}
+
+% Setup IEEE BibLaTeX style
+\usepackage[backend=biber, style=ieee]{biblatex}
+
+% Setup Footer
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+
+\begin{document} 
+
+
+\begin{titlepage}
+    \begin{center}
+        \vspace*{1cm}
+
+        \textbf{AE5093 — Scientific Applications of Deep Learning}
+
+        \vspace{0.5cm}
+            Homework 3
+                
+        \vspace{1.5cm}
+
+        \textbf{Daniel J. Pearson}
+
+        \vfill
+                
+        \vspace{0.8cm}
+        
+        \includegraphics[width=0.4\textwidth]{WPI_LOGO}
+
+        % \includegraphics[width=0.4\textwidth]{university}
+                
+        Aerospace Engineering Department\\
+        Worcester Polytechnic Institute\\
+        \date{\today}
+                
+    \end{center}
+\end{titlepage}
+
+\pagebreak
+
+\section{Introduction}
+In this assigment, a Feed Forward Neural Network (FFNN) is trained and informed using a physical model of a system. The network will be trained on two PDEs: the 1D viscous Burgers equation and the 2D wave equation. The goal is to demonstrate the ability of the FFNN to learn the underlying physics of the system and make predictions based on the model. For both cases, it will be fed a series of boundary conditions and interior points to learn. 
+
+\section{1D Burgers Equation}
+The 1D viscous Burgers equation is a fundamental partial differential equation (PDE) that describes the motion of a viscous fluid. It is given by:
+\begin{equation}
+    u_t + u*u_x = \nu u_{xx}
+\end{equation}
+
+where $u$ is the velocity field, $t$ is time, $x$ is the spatial coordinate, and $\nu$ is the kinematic viscosity.
+
+\subsection{Problem Setup}
+For this problem, the domain is defined as $x \in [-1, 1]$ and $t \in [0, 1]$. With the following boundary conditions:
+\begin{equation}
+    u(x, 0) = -\sin(\pi x)
+\end{equation}
+\begin{equation}
+    u(-1, t) = u(1,t) = 0
+\end{equation}
+ 
+where,
+\[
+\nu \in \lbrace \frac{0.01}{\pi}, \frac{0.0001}{\pi}, 0.0 \rbrace
+\].
+
+For each viscous case, the following parameters are used:
+\begin{itemize}
+    \item Epochs = 5000
+    \item LearningRate = 1000
+    \item Neurons = 50
+    \item $N_{i}  = 5000$ (interior points)
+    \item $N_{b}  = 256$  (boundary points)
+    \item $N_{ic} = 256$  (initial condition points)
+\end{itemize}
+
+The NN will be trained on the interior points, boundary points and initial conditions. The total loss function is defined by:
+\begin{equation}
+    L = L_{pde} + L_{ic} + L_{bc}
+\end{equation}
+where,
+\begin{equation}
+    L_{pde} = u_t + u u_x - \nu u_{xx}
+\end{equation}
+\begin{equation}
+    L_{ic} = \frac{1}{N} \sum_{i=1}^{N} (\theta(u|x_{ic}, t_{ic})-u_{ic})^2
+\end{equation}
+\begin{equation}
+    L_{bc} = L_{ic} = \frac{1}{N} \sum_{i=1}^{N} (\theta(u|x_{bc}, t_{bc})-u_{bc})^2
+\end{equation}
+
+\subsection{Results - No LR Annealing}
+
+
+
+\subsection{Results - LR Annealing}
+
+
+\end{document}
