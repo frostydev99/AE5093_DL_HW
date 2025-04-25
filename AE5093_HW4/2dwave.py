@@ -141,20 +141,13 @@ def pdeLoss(model, x, y, t, k):
 
     u_exact = torch.sin(k*np.pi*x) * torch.sin(k*np.pi*y) * torch.cos(omega*t)
 
-    return torch.mean((u_pred - u_exact)**2)
+    return torch.mean((u_pred)**2)
 
 # == Boundary Loss ==
 def boundary_loss(model, x, y, t, u):
     ub_pred = model(x, y, t)
 
     return torch.mean((ub_pred - u)**2)
-
-# def boundary_loss(model, x, y, t):
-#     ub_pred = model(x, y, t)
-#     omega = np.sqrt(2) * c * np.pi * k
-#     ub_exact = torch.sin(k * np.pi * x) * torch.sin(k * np.pi * y) * torch.cos(omega * t)
-
-#     return torch.mean((ub_pred - ub_exact) ** 2)
 
 # == Initial Condition Loss ==
 def intitial_loss(model, x, y, t, u):
@@ -340,7 +333,6 @@ def animate_solution(model, k, num_frames=100):
     ani = animation.FuncAnimation(fig, update, frames=num_frames, interval=100)
     plt.show()
 
-
 def plot_contour_slices(model, k, num_slices=6):
     model.eval()
 
@@ -389,13 +381,9 @@ def plot_contour_slices(model, k, num_slices=6):
 # === Main Loop ===
 if __name__ == "__main__":
     # === Initialize Model and Optimizer ===
-    # model = PINN2DWave().to(device)
-    model = PINN2DWave_Rowdy().to(device)
+    model = PINN2DWave().to(device)
+    # model = PINN2DWave_Rowdy().to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=learningRate)
-
-    # === Generate Collocation Points ===
-    # x_int, y_int, t_int = generate_uniform_pts(numInt)
-
 
     # === Train for each k case ===
     for k in kCases:
@@ -404,13 +392,10 @@ if __name__ == "__main__":
         # === Generate Initial and Boundary Conditions ===
         x_int, y_int, t_int, x_bc, y_bc, t_bc, u_bc = generate_points(numInt, numBC, k)
         x_ic, y_ic, t_ic, u_ic = generate_initial_conditions(numIC, k)
-        # x_ic, y_ic, t_ic, u_ic = generate_initial_conditions(numIC, k)
-        # x_bc, y_bc, t_bc, u_bc = generate_boundary_conditions(numBC, k)
-
 
         train(model, optimizer, k,
               x_int, y_int, t_int,
               x_ic, y_ic, t_ic, u_ic,
-              x_bc, y_bc, t_bc, u_bc, useAnnealing=False)
+              x_bc, y_bc, t_bc, u_bc, useAnnealing=True)
 
         plot_solution(model, k)
