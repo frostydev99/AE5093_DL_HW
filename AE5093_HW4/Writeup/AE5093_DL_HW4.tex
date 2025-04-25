@@ -152,10 +152,200 @@ where,
 \end{equation}
 
 \subsection{Results - No LR Annealing}
+\subsubsection{Case 1: High Viscosity}
+\begin{figure}[h!]
+    \centering
+    \begin{subfigure}[b]{0.48\textwidth}
+        \includegraphics[width=\textwidth]{1D_PredGrad_NU1.png}
+        \caption{Prediction Gradient for Case 1: High Viscosity}
+        \label{fig:PredGrad_NU1}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.48\textwidth}
+        \includegraphics[width=\textwidth]{1D_Pred_NU1.png}
+        \caption{Prediction for Case 1: High Viscosity}
+        \label{fig:Pred_NU1}
+    \end{subfigure}
+    \caption{Prediction for Case 1: High Viscosity}
+    \label{fig:PredTotal_NU1}
+\end{figure}
 
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.6\textwidth]{1D_Loss_NU1.png}
+    \caption{Loss for Case 1: High Viscosity}
+    \label{fig:Loss_NU1}
+\end{figure}
 
+For the first case, the FFNN was trained on the highest viscocity case. The loss function converged to a value of $10^-1.4$ after approximately 4500 epochs. The prediction gradient and 3d plot of the prediction are shown in Figure \ref{fig:PredTotal_NU1}. Since this function does not have a closed form solution, the prediction is compared to a numerical solution. Using the gradient, it is clear that the boundary and initial conditions are satisfied and is a smooth and continuous function expected for a viscous fluid. This case is the most difficult to learn, as the viscocity is high and there is a signfiicant jump discontinuity in the solution.
 
+\pagebreak
+\subsubsection{Case 2: Low Viscosity}
+\begin{figure}[h!]
+    \centering
+    \begin{subfigure}[b]{0.48\textwidth}
+        \includegraphics[width=\textwidth]{1D_PredGrad_NU2.png}
+        \caption{Prediction Gradient for Case 2: Low Viscosity}
+        \label{fig:PredGrad_NU2}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.48\textwidth}
+        \includegraphics[width=\textwidth]{1D_Pred_NU2.png}
+        \caption{Prediction for Case 2: Low Viscosity}
+        \label{fig:Pred_NU2}
+    \end{subfigure}
+    \caption{Prediction for Case 2: Low Viscosity}
+    \label{fig:PredTotal_NU2}
+\end{figure}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.6\textwidth]{1D_Loss_NU2.png}
+    \caption{Loss for Case 2: Low Viscosity}
+    \label{fig:Loss_NU2}
+\end{figure}
+For the second case, the FFNN was trained on the low viscocity case. The loss function converged to a value of $10^-1.2$ after approximately 3000 epochs. The prediction gradient and 3d plot of the prediction are shown in Figure \ref{fig:PredTotal_NU2}. The prediction is much smoother than the first case and does not have a jump discontinuity. This case is expected to be easier to learn, despite a higher total loss. 
+
+\pagebreak 
+
+\subsubsection{Case 3: No Viscosity}
+\begin{figure}[h!]
+    \centering
+    \begin{subfigure}[b]{0.48\textwidth}
+        \includegraphics[width=\textwidth]{1D_PredGrad_NU3.png}
+        \caption{Prediction Gradient for Case 3: No Viscosity}
+        \label{fig:PredGrad_NU3}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.48\textwidth}
+        \includegraphics[width=\textwidth]{1D_Pred_NU3.png}
+        \caption{Prediction for Case 3: No Viscosity}
+        \label{fig:Pred_NU3}
+    \end{subfigure}
+    \caption{Prediction for Case 3: No Viscosity}
+    \label{fig:PredTotal_NU3}
+\end{figure}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.6\textwidth]{1D_Loss_NU3.png}
+    \caption{Loss for Case 3: No Viscosity}
+    \label{fig:Loss_NU3}
+\end{figure}
+
+For the third case, the FFNN was trained on the no viscocity case. The loss function converged to a value of $10^-1.2$ after approximately 2000 epochs. The prediction gradient and 3d plot of the prediction are shown in Figure \ref{fig:PredTotal_NU3}. The non-viscous case also matched well with numerical solutions. The prediction is smooth and continous, as expected.
 \subsection{Results - LR Annealing}
+For the second set of cases, the FFNN was trained with a learning rate annealing approach. Using, $\lambda=0.9$ the following results are obtained.
+\subsubsection{Case 1: High Viscosity}
+\begin{figure}[h!]
+    \centering
+    \begin{subfigure}[b]{0.48\textwidth}
+        \includegraphics[width=\textwidth]{1D_PredGrad_NU1_Annealing.png}
+        \caption{Prediction Gradient for Case 1: High Viscosity}
+        \label{fig:PredGrad_NU1_LR}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.48\textwidth}
+        \includegraphics[width=\textwidth]{1D_Pred_NU1_Annealing.png}
+        \caption{Prediction for Case 1: High Viscosity}
+        \label{fig:Pred_NU1_LR}
+    \end{subfigure}
+    \caption{Prediction for Case 1: High Viscosity}
+    \label{fig:PredTotal_NU1_LR}
+\end{figure}
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.6\textwidth]{1D_Loss_NU1_Annealing.png}
+    \caption{Loss for Case 1: High Viscosity}
+    \label{fig:Loss_NU1_LR}
+\end{figure}
 
+Compared to the case without annealing, the FFNN was able to converge to a smoother loss function with the data loss function converging significantly faster and closer to the total loss of $10^-1.7$. The prediction gradient and 3d plot of the prediction are shown in Figure \ref{fig:PredTotal_NU1_LR}. The prediction is much smoother than the first case and still captures the jump discontinuity.
+
+\pagebreak
+\subsubsection{Case 2: Low Viscosity}
+\begin{figure}[h!]
+    \centering
+    \begin{subfigure}[b]{0.48\textwidth}
+        \includegraphics[width=\textwidth]{1D_PredGrad_NU2_Annealing.png}
+        \caption{Prediction Gradient for Case 2: Low Viscosity}
+        \label{fig:PredGrad_NU2_LR}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.48\textwidth}
+        \includegraphics[width=\textwidth]{1D_Pred_NU2_Annealing.png}
+        \caption{Prediction for Case 2: Low Viscosity}
+        \label{fig:Pred_NU2_LR}
+    \end{subfigure}
+    \caption{Prediction for Case 2: Low Viscosity}
+    \label{fig:PredTotal_NU2_LR}
+\end{figure}
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.6\textwidth]{1D_Loss_NU2_Annealing.png}
+    \caption{Loss for Case 2: Low Viscosity}
+    \label{fig:Loss_NU2_LR}
+\end{figure}
+
+Comparing the second case with and without learning rate annealing, the FFNN was yet again able to converge to a smoother loss function with less epochs. The data loss function converged to a value of $10^-1.5$ after approximately 2000 epochs.
+
+\pagebreak
+\subsubsection{Case 3: No Viscosity}
+\begin{figure}[h!]
+    \centering
+    \begin{subfigure}[b]{0.48\textwidth}
+        \includegraphics[width=\textwidth]{1D_PredGrad_NU3_Annealing.png}
+        \caption{Prediction Gradient for Case 3: No Viscosity}
+        \label{fig:PredGrad_NU3_LR}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.48\textwidth}
+        \includegraphics[width=\textwidth]{1D_Pred_NU3_Annealing.png}
+        \caption{Prediction for Case 3: No Viscosity}
+        \label{fig:Pred_NU3_LR}
+    \end{subfigure}
+    \caption{Prediction for Case 3: No Viscosity}
+    \label{fig:PredTotal_NU3_LR}
+\end{figure}
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.6\textwidth]{1D_Loss_NU3_Annealing.png}
+    \caption{Loss for Case 3: No Viscosity}
+    \label{fig:Loss_NU3_LR}
+\end{figure}
+
+Comparing the third case with and without learning rate annealing, yet again the FFNN was able to converge to a smoother loss function with less epochs. The data function converged to a value of $10^-1.5$ after approximately 2500 epochs.
+
+\subsection{Conclusion}
+
+Overall, the FFNN was able to learn the underlying physics of the system and make accurate predictions based on the PDE and boundary conditions. The use of learning rate annealing significantly improved the speed of convergence and the smoothness of the loss function. Comparing to a numerical solution, the FFNN performed well and was able to capture the jump discontinuity in the viscous case.
+
+\pagebreak
+
+\section{2D Wave Equation}
+For this problem, the same domain as the previous case is used, but the wave equation is given by:
+\begin{equation}
+    u_{tt} = c^2 (u_{xx} + u_{yy})
+\end{equation}
+where $c$ is the wave speed. The closed form solution is given by:
+\begin{equation}
+    u(x, y, t) = \sin(k \pi x) \sin(k \pi y)cos(\omega t) 
+\end{equation}
+where $k$ is the wave number and $\omega$ is the angular frequency given by:
+\begin{equation}
+    \omega = \sqrt{2} c \pi k
+\end{equation}
+
+The following parameters are used for the 2D wave equation:
+\begin{itemize}
+    \item k = $\lbrace 2, 10, 25 \rbrace$
+    \item Epochs = 10000
+    \item LearningRate = $5 \cdot 10^{-4}$
+    \item Neurons = 50
+    \item $N_{i}  = 5000$ (interior points)
+    \item $N_{b}  = 256$  (boundary points)
+    \item $N_{ic} = 256$  (initial condition points)
+    \item $N_{bc} = 256$  (boundary condition points)
+\end{itemize}
 
 \end{document}

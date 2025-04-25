@@ -226,7 +226,7 @@ if __name__ == "__main__":
         x_ic, t_ic, u_ic = generate_initial_conditions(numIC)
         x_bc, t_bc, u_bc = generate_boundary_conditions(numBC)
 
-        train(model, optimizer, nu, x_int, t_int, x_ic, t_ic, u_ic, x_bc, t_bc, u_bc, useAnnealing=False)
+        train(model, optimizer, nu, x_int, t_int, x_ic, t_ic, u_ic, x_bc, t_bc, u_bc, useAnnealing=True)
 
         model_path = f"pinn_burgers_nu{nu:.6f}.pth"
         torch.save(model.state_dict(), model_path)
