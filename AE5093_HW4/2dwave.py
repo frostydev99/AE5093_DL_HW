@@ -18,13 +18,13 @@ print(f"Using device: {device}")
 
 # === Hyperparameters ===
 numEpochs = 10000
-learningRate = 0.0005
+learningRate = 0.0002
 numInt = 5000
-numIC = 256
-numBC = 256
+numIC = 512
+numBC = 512
 
 # === PDE Parameters ===
-kCases = [2, 10, 25]
+kCases = [25]
 c = 1.0
 
 # === Rowdy Activation ===
@@ -42,25 +42,11 @@ class Rowdy(nn.Module):
     def forward(self, x):
         # Base activation
         phi1 = torch.tanh(x)
-        # Perturbations
+        # Sinusoidal Rowdyness
         phi2 = self.alpha * torch.cos(self.w * x + self.b)
         phi3 = self.beta * torch.sin(self.v * x + self.c)
         return phi1 + phi2 + phi3
     
-class PINN2DWave_Rowdy(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.net = nn.Sequential(
-            nn.Linear(3, 50),
-            Rowdy(50),
-            nn.Linear(50, 50),
-            Rowdy(50),
-            nn.Linear(50, 1)
-        )
-
-    def forward(self, x, y, t):
-        return self.net(torch.cat([x,y,t], dim=1))
-
 # === Model ===
 class PINN2DWave(nn.Module):
     def __init__(self):
@@ -76,15 +62,30 @@ class PINN2DWave(nn.Module):
     def forward(self, x, y, t):
         return self.net(torch.cat([x,y,t], dim=1))
     
+# === Model with Rowdy ===
+class PINN2DWave_Rowdy(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Linear(3, 50),
+            Rowdy(50),
+            nn.Linear(50, 50),
+            Rowdy(50),
+            nn.Linear(50, 1)
+        )
+
+    def forward(self, x, y, t):
+        return self.net(torch.cat([x, y, t], dim=1))
+    
 # === Dataset Generators ===
 def generate_points(n_int, n_bdy, k):
-    # Interior: x, y ∈ [-1, 1], t ∈ [0, 1]
-    x_int = torch.rand((n_int, 1), device=device, requires_grad=True) * 2 - 1
-    y_int = torch.rand((n_int, 1), device=device, requires_grad=True) * 2 - 1
-    t_int = torch.rand((n_int, 1), device=device, requires_grad=True)
+    # Interior Points
+    x_int = torch.rand((n_int, 1), device=device, requires_grad=True) * 2 - 1 # x -> [-1, 1]
+    y_int = torch.rand((n_int, 1), device=device, requires_grad=True) * 2 - 1 # y -> [-1, 1]
+    t_int = torch.rand((n_int, 1), device=device, requires_grad=True)         # t -> [0, 1]
 
     # Boundary (square edges)
-    t_bdy = torch.rand((n_bdy // 4, 1))  # Random times on all edges
+    t_bdy = torch.rand((n_bdy // 4, 1))
 
     xb = torch.cat([
         torch.rand((n_bdy // 4, 1)) * 2 - 1,  # x on bottom edge
@@ -115,9 +116,9 @@ def generate_initial_conditions(num_points_per_dim, k):
 
     X_flat = X.reshape(-1, 1)
     Y_flat = Y.reshape(-1, 1)
-    T_flat = torch.zeros_like(X_flat)
+    T_flat = torch.zeros_like(X_flat, requires_grad=True)
 
-    # Initial condition: u(x, y, 0) = sin(kπx) sin(kπy)
+    # Initial condition: u(x, y, 0) = sin(k pi x) sin(k pi y) cos(omega t) (t = 0)
     U_flat = torch.sin(k * np.pi * X_flat) * torch.sin(k * np.pi * Y_flat)
 
     return X_flat.to(device), Y_flat.to(device), T_flat.to(device), U_flat.to(device)
@@ -137,32 +138,32 @@ def pdeLoss(model, x, y, t, k):
 
     u_pred = u_tt - np.pow(c, 2) * (u_xx + u_yy)
 
-    omega = np.sqrt(2)*c*np.pi*k
-
-    u_exact = torch.sin(k*np.pi*x) * torch.sin(k*np.pi*y) * torch.cos(omega*t)
-
     return torch.mean((u_pred)**2)
 
 # == Boundary Loss ==
-def boundary_loss(model, x, y, t, u):
-    ub_pred = model(x, y, t)
+def boundary_loss(model, x_b, y_b, t_b, u_b):
+    ub_pred = model(x_b, y_b, t_b)
 
-    return torch.mean((ub_pred - u)**2)
+    return torch.mean((ub_pred - u_b)**2)
 
 # == Initial Condition Loss ==
-def intitial_loss(model, x, y, t, u):
-    ui_pred = model(x, y, t)
+def intitial_loss(model, x_ic, y_ic, t_ic, u_ic):
+    ui_pred = model(x_ic, y_ic, t_ic)
 
-    return torch.mean((ui_pred - u) ** 2)
+    return torch.mean((ui_pred - u_ic) ** 2)
 
 # Allocate memory for loss history
 dataLossHist  = []
 pdeLossHist   = []
 totalLossHist = []
 
+# Allocate memory for lambda history
+lambdaHistIC = []
+lambdaHistBC = []
+lambdaHistPDE = []
+
 # Learning Rate Annealing
 def computeLambdaHat(loss):
-    optimizer.zero_grad()
     loss.backward(retain_graph=True)
 
     grads = []
@@ -182,9 +183,13 @@ def train(model, optimizer, k, x_int, y_int, t_int,
     pdeLossHist.clear()
     totalLossHist.clear()
 
+    lambdaHistIC.clear()
+    lambdaHistBC.clear()
+    lambdaHistPDE.clear()
+
     lambda_ic = torch.tensor(1.0).to(device)
-    lambda_bc = torch.tensor(1.0).to(device)
-    lambda_pde = torch.tensor(1.0).to(device)
+    lambda_bc = torch.tensor(0.5).to(device)
+    lambda_pde = torch.tensor(0.5).to(device)
     alpha = 0.9
 
     model.train()
@@ -220,6 +225,11 @@ def train(model, optimizer, k, x_int, y_int, t_int,
         pdeLossHist.append(loss_pde.item())
         totalLossHist.append(total_loss.item())
 
+        # Record lambda history
+        lambdaHistIC.append(lambda_ic.item())
+        lambdaHistBC.append(lambda_bc.item())
+        lambdaHistPDE.append(lambda_pde.item())
+
         # Backprop and step
         total_loss.backward(retain_graph=True)
         optimizer.step()
@@ -227,6 +237,9 @@ def train(model, optimizer, k, x_int, y_int, t_int,
         if epoch % 500 == 0:
             print(f"Epoch {epoch}, Total Loss: {total_loss.item():.4f}, PDE Loss: {loss_pde.item():.4f}, "
                   f"IC Loss: {loss_ic.item():.4f}, BC Loss: {loss_bc.item():.4f}") 
+            
+            print(f"Lambda IC: {lambda_ic.item():.4f}, Lambda BC: {lambda_bc.item():.4f}, Lambda PDE: {lambda_pde.item():.4f}")
+            print("=========================================")
 
 # === Inference & Plot ===
 def plot_truth_pred_error(model, k, t_val=0.25):
@@ -250,21 +263,18 @@ def plot_truth_pred_error(model, k, t_val=0.25):
 
     fig, axs = plt.subplots(1, 3, figsize=(18, 5))
 
-    # True
     c0 = axs[0].contourf(X.cpu().numpy(), Y.cpu().numpy(), u_true, levels=50, cmap='viridis')
     axs[0].set_title(f'True Solution at t={t_val}')
     axs[0].set_xlabel('x')
     axs[0].set_ylabel('y')
     fig.colorbar(c0, ax=axs[0])
 
-    # Predicted
     c1 = axs[1].contourf(X.cpu().numpy(), Y.cpu().numpy(), u_pred, levels=50, cmap='viridis')
     axs[1].set_title(f'Predicted Solution at t={t_val}')
     axs[1].set_xlabel('x')
     axs[1].set_ylabel('y')
     fig.colorbar(c1, ax=axs[1])
 
-    # Error
     c2 = axs[2].contourf(X.cpu().numpy(), Y.cpu().numpy(), error, levels=50, cmap='inferno')
     axs[2].set_title(f'Absolute Error at t={t_val}')
     axs[2].set_xlabel('x')
@@ -289,9 +299,20 @@ def plot_solution(model, k):
     plt.tight_layout()
     plt.show()
 
-    plot_contour_slices(model, k)
+    # === Plot Lambda History ===
+    plt.figure(figsize=(8, 6))
+    plt.plot(lambdaHistIC, label='Lambda IC')
+    plt.plot(lambdaHistBC, label='Lambda BC')
+    plt.plot(lambdaHistPDE, label='Lambda PDE')
+    plt.xlabel("Epoch")
+    plt.ylabel("Lambda")
+    plt.title(f"Lambda History - k = {k}")
+    plt.legend()
+    plt.grid()
+    plt.tight_layout()
+    plt.show()
 
-    plot_truth_pred_error(model, k)
+    plot_truth_pred_error_multiple_times(model, k, times=[0.0, 0.5, 1.0])
 
     animate_solution(model, k)
 
@@ -304,7 +325,6 @@ def animate_solution(model, k, num_frames=100):
     X_flat = X.reshape(-1, 1).to(device)
     Y_flat = Y.reshape(-1, 1).to(device)
 
-    # Estimate z limits over all frames (optional but more robust)
     z_max = -float('inf')
     z_min = float('inf')
     for frame in range(num_frames):
@@ -333,7 +353,7 @@ def animate_solution(model, k, num_frames=100):
     ani = animation.FuncAnimation(fig, update, frames=num_frames, interval=100)
     plt.show()
 
-def plot_contour_slices(model, k, num_slices=6):
+def plot_truth_pred_error_multiple_times(model, k, times=[0.0, 0.25, 0.5, 0.75, 1.0]):
     model.eval()
 
     x = torch.linspace(-1, 1, 100).reshape(-1, 1)
@@ -342,52 +362,61 @@ def plot_contour_slices(model, k, num_slices=6):
     X_flat = X.reshape(-1, 1).to(device)
     Y_flat = Y.reshape(-1, 1).to(device)
 
-    times = torch.linspace(0, 1, num_slices)
-    
-    fig, axs = plt.subplots(2, num_slices, figsize=(4 * num_slices, 8))
+    omega = np.sqrt(2) * c * np.pi * k
 
-    for i, t_val in enumerate(times):
-        T_flat = torch.full_like(X_flat, t_val.item()).to(device)
+    n_times = len(times)
+    fig, axs = plt.subplots(3, n_times, figsize=(4 * n_times, 12))
 
+    for idx, t_val in enumerate(times):
+        T_flat = torch.full_like(X_flat, t_val).to(device)
+
+        # Exact solution
+        u_true = torch.sin(k * np.pi * X_flat) * torch.sin(k * np.pi * Y_flat) * torch.cos(omega * T_flat)
+        u_true = u_true.cpu().numpy().reshape(100, 100)
+
+        # Prediction
         with torch.no_grad():
             u_pred = model(X_flat, Y_flat, T_flat).cpu().numpy().reshape(100, 100)
 
-        # --- Contour plot ---
-        ax1 = axs[0, i]
-        contour = ax1.contourf(X.cpu().numpy(), Y.cpu().numpy(), u_pred, levels=50, cmap='viridis')
-        ax1.set_title(f't = {t_val:.2f}')
-        ax1.set_xlabel('x')
-        ax1.set_ylabel('y')
-        fig.colorbar(contour, ax=ax1)
+        # Error
+        error = np.abs(u_true - u_pred)
 
-        # --- Diagonal slice plot ---
-        ax2 = axs[1, i]
-        diag_x = torch.linspace(-1, 1, 100).reshape(-1, 1).to(device)
-        diag_y = diag_x
-        diag_t = torch.full_like(diag_x, t_val.item()).to(device)
+        # --- Plot True ---
+        c0 = axs[0, idx].contourf(X.cpu().numpy(), Y.cpu().numpy(), u_true, levels=50, cmap='viridis')
+        axs[0, idx].set_title(f'True t={t_val:.2f}')
+        axs[0, idx].set_xlabel('x')
+        axs[0, idx].set_ylabel('y')
+        fig.colorbar(c0, ax=axs[0, idx])
 
-        with torch.no_grad():
-            diag_u = model(diag_x, diag_y, diag_t).cpu().numpy()
+        # --- Plot Prediction ---
+        c1 = axs[1, idx].contourf(X.cpu().numpy(), Y.cpu().numpy(), u_pred, levels=50, cmap='viridis')
+        axs[1, idx].set_title(f'Predicted t={t_val:.2f}')
+        axs[1, idx].set_xlabel('x')
+        axs[1, idx].set_ylabel('y')
+        fig.colorbar(c1, ax=axs[1, idx])
 
-        ax2.plot(diag_x.cpu().numpy(), diag_u)
-        ax2.set_title(f'Diagonal Slice x=y, t={t_val:.2f}')
-        ax2.set_xlabel('x=y')
-        ax2.set_ylabel('u(x,x,t)')
+        # --- Plot Error ---
+        c2 = axs[2, idx].contourf(X.cpu().numpy(), Y.cpu().numpy(), error, levels=50, cmap='inferno')
+        axs[2, idx].set_title(f'Error t={t_val:.2f}')
+        axs[2, idx].set_xlabel('x')
+        axs[2, idx].set_ylabel('y')
+        fig.colorbar(c2, ax=axs[2, idx])
 
     plt.tight_layout()
-    plt.suptitle(f'Stacked Contours and Diagonal Slices - k = {k}', fontsize=16, y=1.02)
+    plt.suptitle(f"Truth vs Prediction vs Error (k={k})", fontsize=20, y=1.02)
     plt.show()
 
 # === Main Loop ===
 if __name__ == "__main__":
-    # === Initialize Model and Optimizer ===
-    model = PINN2DWave().to(device)
-    # model = PINN2DWave_Rowdy().to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=learningRate)
 
     # === Train for each k case ===
     for k in kCases:
         print(f"Training for k = {k}")
+
+        # === Initialize Model and Optimizer ===
+        # model = PINN2DWave().to(device)
+        model = PINN2DWave_Rowdy().to(device)
+        optimizer = torch.optim.Adam(model.parameters(), lr=learningRate)
         
         # === Generate Initial and Boundary Conditions ===
         x_int, y_int, t_int, x_bc, y_bc, t_bc, u_bc = generate_points(numInt, numBC, k)

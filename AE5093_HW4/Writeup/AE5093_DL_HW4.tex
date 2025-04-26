@@ -78,7 +78,7 @@
         \textbf{AE5093 — Scientific Applications of Deep Learning}
 
         \vspace{0.5cm}
-            Homework 3
+            Homework 4
                 
         \vspace{1.5cm}
 
@@ -329,7 +329,7 @@ For this problem, the same domain as the previous case is used, but the wave equ
 \end{equation}
 where $c$ is the wave speed. The closed form solution is given by:
 \begin{equation}
-    u(x, y, t) = \sin(k \pi x) \sin(k \pi y)cos(\omega t) 
+    u(x, y, t) = \sin(k \pi x) \sin(k \pi y) \cos(\omega t) 
 \end{equation}
 where $k$ is the wave number and $\omega$ is the angular frequency given by:
 \begin{equation}
@@ -347,5 +347,202 @@ The following parameters are used for the 2D wave equation:
     \item $N_{ic} = 256$  (initial condition points)
     \item $N_{bc} = 256$  (boundary condition points)
 \end{itemize}
+
+The NN will be trained on the interior points, boundary points and initial conditions. For the wave equation, since the closed form solution is known, the loss function is defined by:
+\begin{equation}
+    L = L_{pde} + L_{ic} + L_{bc}
+\end{equation}
+
+where,
+\begin{equation}
+    L_{pde} = u_{tt} - c^2 (u_{xx} + u_{yy})
+\end{equation}
+
+\begin{equation}
+    L_{ic} = \frac{1}{N} \sum_{i=1}^{N} (\theta(u|x_{ic}, y_{ic}, t_{ic})-u_{ic})^2
+\end{equation}
+\begin{equation}
+    L_{bc} = \frac{1}{N} \sum_{i=1}^{N} (\theta(u|x_{bc}, y_{bc}, t_{bc})-u_{bc})^2
+\end{equation}
+
+\pagebreak
+\subsection{Results - Tanh Activation}
+
+\begin{figure}[h!]
+    \centering
+    \begin{subfigure}[b]{0.48\textwidth}
+        \includegraphics[width=\textwidth]{2D_Error_K1.png}
+        \caption{Error for Case 1: k = 2}
+        \label{fig:Error_K1}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.48\textwidth}
+        \includegraphics[width=\textwidth]{2D_Error_K2.png}
+        \caption{Error for Case 2: k = 10}
+        \label{fig:Error_K2}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.48\textwidth}
+        \includegraphics[width=\textwidth]{2D_Error_K3.png}
+        \caption{Error for Case 3: k = 25}
+        \label{fig:Error_K3}
+    \end{subfigure}
+    \caption{Error using Tanh Activation}
+    \label{fig:Error_Tanh}
+\end{figure}
+\pagebreak
+
+\begin{figure}[h!]
+    \centering
+    \begin{subfigure}[b]{0.48\textwidth}
+        \includegraphics[width=\textwidth]{2D_Loss_K1.png}
+        \caption{Loss for Case 1: k = 2}
+        \label{fig:Loss_K1}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.48\textwidth}
+        \includegraphics[width=\textwidth]{2D_Loss_K2.png}
+        \caption{Loss for Case 2: k = 10}
+        \label{fig:Loss_K2}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.48\textwidth}
+        \includegraphics[width=\textwidth]{2D_Loss_K3.png}
+        \caption{Loss for Case 3: k = 25}
+        \label{fig:Loss_K3}
+    \end{subfigure}
+    \caption{Loss Function using Tanh Activation}
+    \label{fig:Loss_Tanh}
+\end{figure}
+\pagebreak
+
+\begin{figure}[h!]
+    \centering
+    \begin{subfigure}[b]{0.48\textwidth}
+        \includegraphics[width=\textwidth]{2D_Lambda_K1.png}
+        \caption{Lambda for Case 1: k = 2}
+        \label{fig:Lambda_K1}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.48\textwidth}
+        \includegraphics[width=\textwidth]{2D_Lambda_K2.png}
+        \caption{Lambda for Case 2: k = 10}
+        \label{fig:Lambda_K2}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.48\textwidth}
+        \includegraphics[width=\textwidth]{2D_Lambda_K3.png}
+        \caption{Lambda for Case 3: k = 25}
+        \label{fig:Lambda_K3}
+    \end{subfigure}
+    \caption{Lambda for Case 3: No Viscosity}
+    \label{fig:Lambda_Tanh}
+\end{figure}
+
+For the 2D wave equation, the FFNN was able to learn the underlying physics of the first case where $k=2$ decently well. The loss function converged to a value of $10^{-2}$. The prediction gradient and error plot in Figure~\ref{fig:Error_Tanh} show that the prediction matches the initial conditions and boundary conditions well. As time progresses, the prediction becomes less accurate but still captures the expected behavior of the wave equation.
+
+As the wave number increases, the FFNN has a harder time learning the underlying physics of the system. For both the $k=10$ and $k=25$ cases, the FFNN converged to a loss of $10^{-1.2}$. The prediction gradient and error plot in Figure~\ref{fig:Error_Tanh} show that the prediction does not match the initial conditions but does match the boundary conditions. With this, the PDE loss is very low compared to the data loss. The error seen in the prediction is likely due to the fact that the wave number is too high for the FFNN to learn the initial conditions well enough.
+
+Without the initial conditions, the FFNN will not be able to learn the underlying physics of the system at all. The start conditions can be thought of as the initial velocity of the wave. That wave behaves differently depending on the initial velocity and cannot be learned without it. Shown in the loss function, the initial conditions loss converges to a value of exactly 0.2480 for both the $k=10$ and $k=25$ cases and the PDE loss converges to a value of $10^{-6.4}$ and $10^{-7.8}$ respectively. 
+
+\subsection{Results - Rowdy Activation}
+Since the traditional tanh activation function did not perform well for the 2D wave equation, a new activation function was considered. The Rowdy Activation Function (Deep Kronecker neural network) is given by:
+\begin{equation}
+    \phi_1 = \frac{e^z-e^{-z}}{e^z+e^{-z}} \equiv \tanh(z)
+\end{equation}
+\begin{equation}
+    \phi_2 = n a \sin((k-1)n x)
+\end{equation}
+\begin{equation}
+    \phi_3 = n b \sin((k-1)n x)
+\end{equation}
+
+\begin{figure}[h!]
+    \centering
+    \begin{subfigure}[b]{0.48\textwidth}
+        \includegraphics[width=\textwidth]{2D_Error_K1_Rowdy.png}
+        \caption{Error for Case 1: k = 2}
+        \label{fig:Error_K1_Rowdy}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.48\textwidth}
+        \includegraphics[width=\textwidth]{2D_Error_K2_Rowdy.png}
+        \caption{Error for Case 2: k = 10}
+        \label{fig:Error_K2_Rowdy}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.48\textwidth}
+        \includegraphics[width=\textwidth]{2D_Error_K3.png}
+        \caption{Error for Case 3: k = 25}
+        \label{fig:Error_K3_Rowdy}
+    \end{subfigure}
+    \caption{Error using Rowdy Activation}
+    \label{fig:Error_Rowdy}
+\end{figure}
+\pagebreak
+
+\begin{figure}[h!]
+    \centering
+    \begin{subfigure}[b]{0.48\textwidth}
+        \includegraphics[width=\textwidth]{2D_Loss_K1_Rowdy.png}
+        \caption{Loss for Case 1: k = 2}
+        \label{fig:Loss_K1_Rowdy}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.48\textwidth}
+        \includegraphics[width=\textwidth]{2D_Loss_K2_Rowdy.png}
+        \caption{Loss for Case 2: k = 10}
+        \label{fig:Loss_K2_Rowdy}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.48\textwidth}
+        \includegraphics[width=\textwidth]{2D_Loss_K3.png}
+        \caption{Loss for Case 3: k = 25}
+        \label{fig:Loss_K3_Rowdy}
+    \end{subfigure}
+    \caption{Loss Function using Rowdy Activation}
+    \label{fig:Loss_Rowdy}
+\end{figure}
+\pagebreak
+
+\begin{figure}[h!]
+    \centering
+    \begin{subfigure}[b]{0.48\textwidth}
+        \includegraphics[width=\textwidth]{2D_Lambda_K1_Rowdy.png}
+        \caption{Loss for Case 1: k = 2}
+        \label{fig:Lambda_K1_Rowdy}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.48\textwidth}
+        \includegraphics[width=\textwidth]{2D_Lambda_K2_Rowdy.png}
+        \caption{Loss for Case 2: k = 10}
+        \label{fig:Lambda_K2_Rowdy}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.48\textwidth}
+        \includegraphics[width=\textwidth]{2D_Lambda_K3.png}
+        \caption{Loss for Case 3: k = 25}
+        \label{fig:Lambda_K3_Rowdy}
+    \end{subfigure}
+    \caption{Lambda using Rowdy Activation}
+    \label{fig:Lambda_Rowdy}
+\end{figure}
+
+Using the Rowdy activation function, the FFNN was able to achieve slightly better results for case 1 with $k=2$. The loss function reached a value of $10^{-2.5}$ and still descending. Given more epochs, the FFNN would likely converge to a lower loss function but from this point was a relatively small gradient. The prediction and error plot in Figure~\ref{fig:Error_Rowdy} show that the prediction matches the initial conditions and boundary conditions well. Unlike the tanh activation function, the Rowdy activation function was able to learn the initial conditions well and through the entire domain. 
+
+Despite the better results for case 1, the FFNN still was unable to learn the underlying physics of the system for the $k=10$ and $k=25$ cases. Yet again, the initial conditions are still converging to a value of eitherr 0.2480 or 0.2490. The PDE loss is still very low compared to the data loss. Using the Rowdy activation function, the PDE loss converged to a value less than that of the tanh activation function.
+
+\section{Conclusion}
+In this assignment, a FFNN was trained on the 1D viscous Burgers equation as well as the 2D wave equation. While the FFNN did a good job learning the 1D viscous Burgers equation, it clearly struggled with the higher wave numbers in the 2D wave function. This assignment was a great introduction to the use of PINNs and provided a great baseline for future work into the final project. Even for the 1D viscous Burgers equation, where the exact closed form solution is not known, the PINN was able to learn the equation well and provide an approximation comparable to a traditional numerical solution. The use of learning rate annealing proved to be very useful in faster convergence and left all cases with a smoother loss function.
+
+Despite the success of the PINN for the 1D viscous Burgers equation and Case 1 of the 2D wave equation, the PINN still struggled with the higher wave numbers. The use of the Rowdy activation function did help with the convergence of the loss function but still did not improve the solution for the higher wave numbers. Still the major issue with the PINN is the significant dependence on the initial conditions. Without the initial conditions, the PINN will not be able to learn the full phyiscs of the system. This is true for all PDEs and even effects numerical solutions, not just PINNs, but this particular case is very sensitive to the initial conditions - unveiling the limitations of the PINN approach. Potential future work could include the use of a different base activation function, a different loss function, or further tunning of the hyperparameters despite current efforts returning no significant improvements.
+
+\newpage
+\section{1dBurgers.py}
+\lstinputlisting[language=python]{1dBurgers.py}
+
+\newpage
+\section{2dWave.py}
+\lstinputlisting[language=python]{2dwave.py}
 
 \end{document}
