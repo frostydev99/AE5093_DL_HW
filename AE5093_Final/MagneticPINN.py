@@ -1,42 +1,37 @@
 import torch
 import torch.nn as nn
-import torch.autograd as autograd
 
-from utils.earthDipole import earthDipoleField, earthWMMField
-
-class MagneticPINN(nn.Module):
+class MagneticPINN_BField(nn.Module):
+    """
+    Predicts B-field [Bx, By, Bz] at a 3D input position [x, y, z]
+    """
     def __init__(self):
-        super(MagneticPINN, self).__init__()
-
+        super().__init__()
         self.net = nn.Sequential(
             nn.Linear(3, 64),
             nn.Tanh(),
             nn.Linear(64, 64),
             nn.Tanh(),
-            nn.Linear(64, 3)
+            nn.Linear(64, 3)  # Output: Bx, By, Bz
         )
 
     def forward(self, x):
         return self.net(x)
-    
-def totalLoss(model, coords):
 
-    coords.requires_grad = True
+def pdeLoss_BField(model, X_norm, ecef_mean, ecef_std):
+    """
+    Enforces ∇·B = 0 using autograd. Input X is normalized ECEF positions.
+    """
+    X_norm.requires_grad_(True)
 
-    B_pred = model(coords)
+    B_pred = model(X_norm)  # depends on X_norm
 
-    Bx, By, Bz = B_pred[:, 0], B_pred[:, 1], B_pred[:, 2]
+    divB = 0
+    for i in range(3):  # Bx, By, Bz
+        grad_i = torch.autograd.grad(
+            B_pred[:, i].sum(), X_norm,  # must match input to model
+            create_graph=True, retain_graph=True
+        )[0][:, i]
+        divB += grad_i
 
-    grads = torch.ones_like(Bx, device=coords.device)
-
-    dBx_dx = autograd.grad(Bx, coords, grad_outputs=grads, create_graph=True)[0][:, 0]
-    dBy_dy = autograd.grad(By, coords, grad_outputs=grads, create_graph=True)[0][:, 1]
-    dBz_dz = autograd.grad(Bz, coords, grad_outputs=grads, create_graph=True)[0][:, 2]
-
-    div_B = dBx_dx + dBy_dy + dBz_dz
-    loss_div_B = torch.mean(div_B ** 2)
-
-    ideal_B = earthWMMField(coords)
-    loss_dipole = torch.mean((B_pred - ideal_B) ** 2)
-
-    return loss_div_B + 10 * loss_dipole
+    return torch.mean(divB**2)
