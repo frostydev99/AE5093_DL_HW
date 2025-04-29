@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.autograd as autograd
 
-from utils.earthDipole import earthDipoleField
+from utils.earthDipole import earthDipoleField, earthWMMField
 
 class MagneticPINN(nn.Module):
     def __init__(self):
@@ -36,7 +36,7 @@ def totalLoss(model, coords):
     div_B = dBx_dx + dBy_dy + dBz_dz
     loss_div_B = torch.mean(div_B ** 2)
 
-    ideal_B = earthDipoleField(coords)
+    ideal_B = earthWMMField(coords)
     loss_dipole = torch.mean((B_pred - ideal_B) ** 2)
 
     return loss_div_B + 10 * loss_dipole
