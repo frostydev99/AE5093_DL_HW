@@ -4,7 +4,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 import matplotlib.pyplot as plt
-# from sklearn.model_selection import train_test_split
 from sklearn.model_selection import train_test_split
 
 from models.MagneticPINN import MagneticPINN
@@ -46,7 +45,8 @@ B_tensor, B_mean, B_std = normalizeTensor(B_tensor)
 train_idx, test_idx = train_test_split(np.arange(numSamples), test_size=0.2, random_state=seed)
 ecef_train, ecef_test = ecefTensor[train_idx].to(device), ecefTensor[test_idx].to(device)
 B_train, B_test = B_tensor[train_idx].to(device), B_tensor[test_idx].to(device)
-r_dipole = r_dipole.to(device)
+r_dipole_train, r_dipole_test = r_dipole[train_idx].to(device), r_dipole[test_idx].to(device)
+
 m_dipole = m_dipole.to(device)
 ecef_mean = ecef_mean.to(device)
 ecef_std = ecef_std.to(device)
@@ -96,28 +96,16 @@ torch.save({
     'm_dipole': m_dipole,
 }, "magModel.pth")
 
-# === Train Localizer ===
-grid_N = 8
-span = 2e6
-x = torch.linspace(-span, span, grid_N)
-y = torch.linspace(-span, span, grid_N)
-z = torch.linspace(-span, span, grid_N)
-X, Y, Z = torch.meshgrid(x, y, z, indexing='ij')
-coords = torch.stack([X, Y, Z], dim=-1).reshape(-1, 3).to(device)
-coords_norm = (coords - ecef_mean) / (ecef_std + 1e-8)
+# === Train Localizer (Per-sample) ===
+X_input = B_train  # Shape: (n_train, 3)
+Y_target = r_dipole_train  # Shape: (n_train, 3)
 
-with torch.no_grad():
-    B_pred = magModel(coords_norm) * B_std + B_mean
-
-X_input = B_pred.view(-1).unsqueeze(0)
-Y_target = r_dipole.unsqueeze(0)
-
-locModel = LocalizerNN(X_input.shape[1]).to(device)
+locModel = LocalizerNN(input_size=3).to(device)
 locOptim = torch.optim.Adam(locModel.parameters(), lr=lr_loc)
 lossFN = nn.MSELoss()
 
+numEpochs_loc = 20000
 lossHist = []
-numEpochs_loc = 3000
 
 for epoch in range(numEpochs_loc):
     locOptim.zero_grad()
@@ -128,12 +116,12 @@ for epoch in range(numEpochs_loc):
     lossHist.append(loss.item())
 
     if epoch % 100 == 0:
-        err = torch.norm(pred - Y_target).item()
-        print(f"Epoch {epoch:4d} | Loss: {loss.item():.8e} | Position Error: {err:.8f} m")
+        err = torch.norm(pred - Y_target, dim=1).mean().item()
+        print(f"Epoch {epoch:4d} | Loss: {loss.item():.8e} | Mean Position Error: {err:.8f} m")
 
 # === Save Localizer Model ===
-pred_dipole = locModel(X_input).detach().cpu().numpy().squeeze()
-r_dipole_true = r_dipole.cpu().numpy().squeeze()
+pred_dipole = locModel(X_input).detach().cpu().numpy()
+r_dipole_true = Y_target.cpu().numpy()
 
 torch.save({
     'model_state_dict': locModel.state_dict(),
@@ -141,10 +129,9 @@ torch.save({
     'true_r_dipole': r_dipole_true,
 }, "locModel.pth")
 
-print("=== Final Results ===")
-print(f"True Dipole Position: {r_dipole_true}")
-print(f"Predicted Dipole Position: {pred_dipole}")
-print(f"Error: {np.linalg.norm(pred_dipole - r_dipole_true):.2f} m")
+# === Final Results Summary ===
+print("=== Final Results (Training Samples) ===")
+print(f"Mean Localization Error: {np.mean(np.linalg.norm(pred_dipole - r_dipole_true, axis=1)):.2f} m")
 
 plt.figure(figsize=(10, 5))
 plt.plot(lossHist)
@@ -155,17 +142,3 @@ plt.yscale('log')
 plt.grid()
 plt.tight_layout()
 plt.show()
-
-# === Test Set Localization ===
-coords_test = torch.stack([X, Y, Z], dim=-1).reshape(-1, 3).to(device)
-coords_test_norm = (coords_test - ecef_mean) / (ecef_std + 1e-8)
-
-with torch.no_grad():
-    B_test_grid = magModel(coords_test_norm) * B_std + B_mean
-    X_input_test = B_test_grid.view(-1).unsqueeze(0)
-    pred_test_dipole = locModel(X_input_test).cpu().numpy().squeeze()
-
-print("\n=== Test Grid Localization ===")
-print(f"Predicted Dipole: {pred_test_dipole}")
-print(f"True Dipole: {r_dipole_true}")
-print(f"Test Grid Error: {np.linalg.norm(pred_test_dipole - r_dipole_true):.2f} m")

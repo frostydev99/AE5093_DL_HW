@@ -2,11 +2,11 @@ import torch
 import torch.nn as nn
 
 class LocalizerNN(nn.Module):
-    def __init__(self, numSamples):
+    def __init__(self, input_size):
         super().__init__()
 
         self.net = nn.Sequential(
-            nn.Linear(numSamples, 128),
+            nn.Linear(input_size, 128),
             nn.ReLU(),
             nn.Linear(128, 128),
             nn.ReLU(),

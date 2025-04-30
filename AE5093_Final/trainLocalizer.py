@@ -92,4 +92,3 @@ plt.title("Dipole Localizer Training Loss")
 plt.grid()
 plt.tight_layout()
 plt.show()
-

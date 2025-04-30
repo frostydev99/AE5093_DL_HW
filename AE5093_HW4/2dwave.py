@@ -41,7 +41,7 @@ class Rowdy(nn.Module):
 
     def forward(self, x):
         # Base activation
-        phi1 = torch.tanh(x)
+        phi1 = torch.relu(x)
         # Sinusoidal Rowdyness
         phi2 = self.alpha * torch.cos(self.w * x + self.b)
         phi3 = self.beta * torch.sin(self.v * x + self.c)
