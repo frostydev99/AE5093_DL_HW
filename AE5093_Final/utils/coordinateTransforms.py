@@ -1,30 +1,31 @@
 import numpy as np
-import torch
 
-def lla_to_ecef(lat, lon, alt):
-    """
-    Converts (lat, lon, alt) in degrees, meters to ECEF coordinates.
-    """
-    a = 6378137.0  # Earth semi-major axis
-    e = 8.1819190842622e-2  # eccentricity
+def lla2ecef(lat, lon, alt):
+    a = 6378137.0
+    f = 1 / 298.257223563
+    e2 = f * (2 - f)
 
-    lat = np.radians(lat)
-    lon = np.radians(lon)
+    lat, lon = np.deg2rad(lat), np.deg2rad(lon)
 
-    N = a / np.sqrt(1 - e**2 * np.sin(lat)**2)
+    N = a / np.sqrt(1 - e2 * np.sin(lat)**2)
+    X = (N + alt) * np.cos(lat) * np.cos(lon)
+    Y = (N + alt) * np.cos(lat) * np.sin(lon)
+    Z = (N * (1 - e2) + alt) * np.sin(lat)
 
-    x = (N + alt) * np.cos(lat) * np.cos(lon)
-    y = (N + alt) * np.cos(lat) * np.sin(lon)
-    z = (N * (1 - e**2) + alt) * np.sin(lat)
+    return np.stack((X, Y, Z), axis=-1)
 
-    return np.stack((x, y, z), axis=-1)
+def ecef2lla(X, Y, Z):
+    a = 6378137.0
+    f = 1 / 298.257223563
+    e2 = f * (2 - f)
 
-def normalize_positions(positions):
-    """ Normalize ECEF positions for NN training """
-    mean = np.mean(positions, axis=0)
-    std = np.std(positions, axis=0)
-    norm_positions = (positions - mean) / std
-    return norm_positions, mean, std
+    lon = np.arctan2(Y, X)
+    p = np.sqrt(X**2 + Y**2)
+    lat = np.arctan2(Z, p * (1 - e2))
+    N = a / np.sqrt(1 - e2 * np.sin(lat)**2)
+    alt = p / np.cos(lat) - N
 
-def unnormalize_positions(norm_positions, mean, std):
-    return norm_positions * std + mean
+    lat = np.rad2deg(lat)
+    lon = np.rad2deg(lon)
+
+    return lat, lon, alt

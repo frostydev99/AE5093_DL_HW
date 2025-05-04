@@ -56,4 +56,7 @@ def generateTrainingData(n_samples):
     # === Total field is background + disturbance ===
     B_total = B_background + B_disturbance
 
-    return lla_tensor, ecef_tensor, B_background, B_disturbance, B_total, r_dipole, m_dipole
+    # === Save R Sensor ===
+    r_sensor = ecef_tensor
+
+    return lla_tensor, ecef_tensor, B_background, B_disturbance, B_total, r_dipole, m_dipole, r_sensor

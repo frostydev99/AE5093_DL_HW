@@ -1,12 +1,13 @@
+# === main.py ===
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split
 
 from models.MagneticPINN import MagneticPINN
 from models.LocalizerNN import LocalizerNN
-
 from utils.generateTrainingData import generateTrainingData
 
 # === Normalize Tensor ===
@@ -30,29 +31,31 @@ print(f"Using device: {device}")
 # === Hyperparameters ===
 numSamples = 10000
 numEpochs = 5000
+lr_mag = 0.0003
+lr_loc = 0.0001
 
 # === Prepare Data ===
-ecefTensor, B_tensor, r_dipole, m_dipole, anchorIdx = generateTrainingData(numSamples)
+llaTensor, ecefTensor, B_background, B_disturbance, B_tensor, r_dipole, m_dipole, r_sensor = generateTrainingData(numSamples)
 
 # Normalize
 ecefTensor, ecef_mean, ecef_std = normalizeTensor(ecefTensor)
-
 B_tensor, B_mean, B_std = normalizeTensor(B_tensor)
 
-# Pack data and pass to GPU
-X = ecefTensor.to(device)
-Y = B_tensor.to(device)
+# Split into train/test
+train_idx, test_idx = train_test_split(np.arange(numSamples), test_size=0.2, random_state=seed)
+ecef_train, ecef_test = ecefTensor[train_idx].to(device), ecefTensor[test_idx].to(device)
+B_train, B_test = B_tensor[train_idx].to(device), B_tensor[test_idx].to(device)
+r_dipole_train, r_dipole_test = r_dipole[train_idx].to(device), r_dipole[test_idx].to(device)
+
 m_dipole = m_dipole.to(device)
-r_dipole = r_dipole.to(device)
 ecef_mean = ecef_mean.to(device)
 ecef_std = ecef_std.to(device)
+B_mean = B_mean.to(device)
+B_std = B_std.to(device)
 
 # === Setup Model ===
 magModel = MagneticPINN().to(device)
-localizerModel = LocalizerNN().to(device)
-
-magOptim = torch.optim.Adam(magModel.parameters(), lr=0.001)
-localizerOptim = torch.optim.Adam(localizerModel.parameters(), lr=0.001)
+magOptim = torch.optim.Adam(magModel.parameters(), lr=lr_mag)
 
 # === Train Magnetic Model ===
 totalLossHist_mag = []
@@ -61,13 +64,10 @@ pdeLossHist_mag = []
 
 for epoch in range(numEpochs):
     magOptim.zero_grad()
-
-    Y_pred = magModel(X)
-
-    lossData = F.mse_loss(Y_pred, Y)
-    lossPDE = magModel.pdeLoss(X, ecef_mean, ecef_std)
+    Y_pred = magModel(ecef_train)
+    lossData = F.mse_loss(Y_pred, B_train)
+    lossPDE = magModel.pdeLoss(ecef_train, ecef_mean, ecef_std)
     loss = lossData + 1.0 * lossPDE
-
     loss.backward()
     magOptim.step()
 
@@ -76,14 +76,39 @@ for epoch in range(numEpochs):
     pdeLossHist_mag.append(lossPDE.item())
 
     if epoch % 50 == 0:
-        print(f"Epoch {epoch}: Total Loss: {loss.item():.4f}, Data Loss: {lossData.item():.4f}, PDE Loss: {lossPDE.item():.4f}")
+        print(f"Epoch {epoch}: Total Loss: {loss.item():.4f} | Data Loss: {lossData.item():.4f} | PDE Loss: {lossPDE.item():.4f}")
 
+# === Mag Test Set Evaluation ===
+magModel.eval()
+with torch.no_grad():
+    B_test_pred = magModel(ecef_test)
+    test_loss_data = F.mse_loss(B_test_pred, B_test).item()
+print(f"[TEST] MagneticPINN Data Loss: {test_loss_data:.6e}")
+
+# === Save Magnetic Model ===
 torch.save({
     'model_state_dict': magModel.state_dict(),
     'ecef_mean': ecef_mean,
     'ecef_std': ecef_std,
+    'B_train': B_train,
     'B_mean': B_mean,
     'B_std': B_std,
     'r_dipole': r_dipole,
+    'r_dipole_train': r_dipole_train,
     'm_dipole': m_dipole,
+    'r_sensor': r_sensor[train_idx],
 }, "magModel.pth")
+
+# === Plot Loss History ===
+plt.figure(figsize=(10, 5))
+plt.plot(pdeLossHist_mag, label='PDE Loss')
+plt.plot(dataLossHist_mag, label='Data Loss')
+plt.plot(totalLossHist_mag, label='Total Loss')
+plt.title("PDE Loss History")
+plt.xlabel("Epoch")
+plt.ylabel("Loss")
+plt.yscale('log')
+plt.legend()
+plt.grid()
+plt.tight_layout()
+plt.show()

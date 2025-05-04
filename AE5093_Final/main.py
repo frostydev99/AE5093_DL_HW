@@ -90,55 +90,10 @@ torch.save({
     'model_state_dict': magModel.state_dict(),
     'ecef_mean': ecef_mean,
     'ecef_std': ecef_std,
+    'B_train': B_train,
     'B_mean': B_mean,
     'B_std': B_std,
     'r_dipole': r_dipole,
+    'r_dipole_train': r_dipole_train,
     'm_dipole': m_dipole,
 }, "magModel.pth")
-
-# === Train Localizer (Per-sample) ===
-X_input = B_train  # Shape: (n_train, 3)
-Y_target = r_dipole_train  # Shape: (n_train, 3)
-
-locModel = LocalizerNN(input_size=3).to(device)
-locOptim = torch.optim.Adam(locModel.parameters(), lr=lr_loc)
-lossFN = nn.MSELoss()
-
-numEpochs_loc = 20000
-lossHist = []
-
-for epoch in range(numEpochs_loc):
-    locOptim.zero_grad()
-    pred = locModel(X_input)
-    loss = lossFN(pred, Y_target)
-    loss.backward()
-    locOptim.step()
-    lossHist.append(loss.item())
-
-    if epoch % 100 == 0:
-        err = torch.norm(pred - Y_target, dim=1).mean().item()
-        print(f"Epoch {epoch:4d} | Loss: {loss.item():.8e} | Mean Position Error: {err:.8f} m")
-
-# === Save Localizer Model ===
-pred_dipole = locModel(X_input).detach().cpu().numpy()
-r_dipole_true = Y_target.cpu().numpy()
-
-torch.save({
-    'model_state_dict': locModel.state_dict(),
-    'input_size': X_input.shape[1],
-    'true_r_dipole': r_dipole_true,
-}, "locModel.pth")
-
-# === Final Results Summary ===
-print("=== Final Results (Training Samples) ===")
-print(f"Mean Localization Error: {np.mean(np.linalg.norm(pred_dipole - r_dipole_true, axis=1)):.2f} m")
-
-plt.figure(figsize=(10, 5))
-plt.plot(lossHist)
-plt.title("Localization Training Loss")
-plt.xlabel("Epoch")
-plt.ylabel("Loss")
-plt.yscale('log')
-plt.grid()
-plt.tight_layout()
-plt.show()
